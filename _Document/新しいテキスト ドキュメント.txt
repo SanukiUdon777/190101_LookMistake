@@ -1,0 +1,786 @@
+'=========================================================================
+'変数宣言
+'=========================================================================
+'ワークシート名
+Private InpSheet As String      '文字列
+Private HolidaySheet As String   '文字列
+Private Calc1Sheet As String     '文字列
+Private Calc2Sheet As String     '文字列
+Private Out1Sheet As String      '文字列
+Private Out2Sheet As String      '文字列
+Private ws As Worksheet
+
+'ワークシート座標
+Private PosX_1DayWorkTime As Integer
+Private PosY_1DayWorkTime As Integer
+
+Private PosXY_HolidayArea As String   '文字列
+
+Private PosXY_OffsetSheetCopy As String
+
+Private PosX_OffsetStartDB As Integer
+Private PosY_OffsetStartDB As Integer
+Private Counter_DeleteY As Integer
+
+Private PosX_WorkNumber As Integer
+Private PosX_WorkName1 As Integer
+Private PosX_WorkName2 As Integer
+Private PosX_WorkName3 As Integer
+
+Private PosX_StartDay As Integer
+Private PosX_EndDay As Integer
+Private PosX_Priority As Integer
+Private PosX_PlanDays As Integer
+Private PosX_AddDays As Integer
+Private PosX_Charge As Integer
+Private PosX_Progress As Integer
+
+Private PosX_CalcBuf1 As Integer
+Private PosX_CalcBuf2 As Integer
+Private PosX_CalcBuf3 As Integer
+Private PosX_CalcBuf4 As Integer
+Private PosX_CalcBuf5 As Integer
+Private PosX_CalcBuf6 As Integer
+
+
+'計算用RAM
+Private OneDayWorkTime As Integer    '一日当たりの作業時間
+
+Private Y As Integer            '整数型
+Private WB As Workbook          'ブック
+Private OutRange As Range       'セル範囲
+
+Private EndX As Integer       '表の最終行
+Private EndY As Integer       '表の最終列
+
+Private CntX As Integer    '作業カウンタ
+Private CntY As Integer    '作業カウンタ
+Private PosX As Integer    '作業カウンタ
+Private PosY As Integer    '作業カウンタ
+
+Private BufInt1 As Integer    '
+Private BufInt2 As Integer    '
+Private BufInt3 As Integer    '
+
+Private BufDate1 As Date    '
+Private BufData2 As Date    '
+
+Private BufStr1 As String    '
+Private BufStr2 As String    '
+Private BufStr3 As String    '
+
+Private StartDay As Date       '
+
+Private NowWorkStartDay As Double     '
+Private NowWorkStartTime As Double  '
+
+Private CheckNowProject  As String  '
+Private CheckNowCharge  As String   '
+
+Private NowWorkDayCount As Double    '作業日数
+
+Private MaxSortLoop As Integer       '
+
+Private MinWorkStartDay As Date    '
+
+Private InX  As Integer
+Private InY  As Integer
+Private OutX As Integer
+Private OutY As Integer
+
+
+'=========================================================================
+'MainFunction
+'=========================================================================
+Sub SortCopy_Click()
+
+    UserForm1.Show
+    
+    '下記処理は、呼び出しフォームで実行する
+
+    'Call Initial_WorkSheet
+    'Call Initial_CalcValue("2019/1/1")
+    'Call Sort_Task
+    'Call Display_Chart
+    'Call Display_List
+    'Call End_WorkSheet
+
+
+End Sub
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'ワークシート名の準備
+'-------------------------------------------------------------------------
+Function Initial_WorkSheet()
+    '-------------------------------------
+    '使用するワークシート名
+    '-------------------------------------
+    HolidaySheet = "(入力1)休暇設定日"
+    InpSheet = "(入力2)タスク一覧"
+    
+    Calc1Sheet = "途中計算1"
+    Calc2Sheet = "途中計算2"
+
+    Out1Sheet = "(出力1)WBSガントチャート"
+    Out2Sheet = "(出力2)ToDoリスト"
+
+
+    '-------------------------------------
+    '使用するワークシート座標
+    '-------------------------------------
+    '休日のリスト
+    PosXY_HolidayArea = "B3:B250"
+    
+    '一日当たりの労働時間
+    PosX_1DayWorkTime = 14
+    PosY_1DayWorkTime = 2
+    
+    'コピー元の座標
+    PosXY_OffsetSheetCopy = "A1"
+        
+    'コピー先の座標（計算用の表座標）
+    PosX_OffsetStartDB = 1
+    PosY_OffsetStartDB = 1
+    
+    Counter_DeleteY = 2 'コピーした表より計算用に先頭２行削除
+    
+    
+    'コピー先の座標（計算用の表座標）
+    PosX_WorkNumber = 1
+    
+    PosX_WorkName1 = 2
+    PosX_WorkName2 = 3
+    PosX_WorkName3 = 4
+    
+    PosX_StartDay = 5
+    PosX_EndDay = 6
+    PosX_Priority = 7
+    PosX_PlanDays = 8
+    PosX_AddDays = 9
+    PosX_Charge = 10
+    PosX_Progress = 11
+    
+    
+    PosX_CalcBuf1 = 12
+    PosX_CalcBuf2 = 13
+    PosX_CalcBuf3 = 14
+    PosX_CalcBuf4 = 15
+    PosX_CalcBuf5 = 16
+    PosX_CalcBuf6 = 17
+ 
+
+End Function
+
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'計算値の初期化
+'-------------------------------------------------------------------------
+Function Initial_CalcValue(ProjectStartDay As Date)
+    '-------------------------------------
+    '全体設定
+    '-------------------------------------
+    OneDayWorkTime = Worksheets(InpSheet).Cells(PosY_1DayWorkTime, PosX_1DayWorkTime)  '1日８時間労働
+
+
+    '-------------------------------------
+    '計算用のシート準備
+    '-------------------------------------
+    Application.DisplayAlerts = False 'アラートメッセージ無効
+    
+        For Each ws In Worksheets
+            If ws.Name = Calc1Sheet Then Worksheets(Calc1Sheet).Delete
+        Next ws
+
+        For Each ws In Worksheets
+            If ws.Name = Calc2Sheet Then Worksheets(Calc2Sheet).Delete
+        Next ws
+
+    Application.DisplayAlerts = True 'アラートメッセージ有効
+    
+    
+    '-------------------------------------
+    'シート新規作成
+    '-------------------------------------
+    Sheets.Add(After:=Worksheets(Worksheets.Count)).Name = Calc1Sheet
+    Sheets.Add(After:=Worksheets(Worksheets.Count)).Name = Calc2Sheet
+    
+    
+    '-------------------------------------
+    'コピー先シート/セルの準備
+    '-------------------------------------
+    Worksheets(Calc1Sheet).Cells.Clear
+    Worksheets(Calc2Sheet).Cells.Clear
+    
+    
+    '-------------------------------------
+    '書式条件のクリア
+    '-------------------------------------
+    Sheets(Calc1Sheet).Cells.FormatConditions.Delete
+    Sheets(Calc2Sheet).Cells.FormatConditions.Delete
+   
+   
+    '-------------------------------------
+    '工程表のコピー
+    '-------------------------------------
+    Sheets(Calc1Sheet).Activate
+    
+    Set OutRange = Sheets(Calc1Sheet).Cells(Rows.Count, "A").End(xlUp).Offset(0, 0) 'コピー先
+    Sheets(InpSheet).Range(PosXY_OffsetSheetCopy).CurrentRegion.SpecialCells(xlVisible).Copy _
+    Destination:=OutRange '必要情報をコピーする
+ 
+    
+    For i = 1 To Counter_DeleteY '計算用に先頭行を削除
+        Set OutRange = Sheets(Calc1Sheet).Cells(Rows.Count, "A").End(xlUp).Offset(0, 0)
+        OutRange.EntireRow.Delete Shift:=xlUp '一列削除
+
+    Next i
+    
+'====================================='
+'情報編集(1)
+'====================================='
+    '表の最終行列を取得
+    EndY = Worksheets(Calc1Sheet).Cells(Rows.Count, PosX_WorkName3).End(xlUp).Row
+    EndX = Worksheets(Calc1Sheet).Cells(PosX_OffsetStartDB, Columns.Count).End(xlToLeft).Column
+
+    For i = PosY_OffsetStartDB To EndY
+    
+        'コピー元の行番号をセットする（最後にチャート化する時に使用する）
+        Worksheets(Calc1Sheet).Cells(i, PosX_WorkNumber) = (i + Counter_DeleteY)
+        
+        If Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1) <> "" Then
+            BufStr1 = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1)
+            BufDate1 = Worksheets(Calc1Sheet).Cells(i, PosX_StartDay)
+            BufDate2 = Worksheets(Calc1Sheet).Cells(i, PosX_EndDay)
+            BufInt1 = Worksheets(Calc1Sheet).Cells(i, PosX_Priority)
+            
+            Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1) = ""
+            
+        ElseIf Worksheets(Calc1Sheet).Cells(i, PosX_WorkName2) <> "" Then
+            BufStr2 = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName2)
+            Cells(i, PosX_WorkName2) = ""
+            
+        Else
+            Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1) = BufStr1
+            Worksheets(Calc1Sheet).Cells(i, PosX_WorkName2) = BufStr2
+            Worksheets(Calc1Sheet).Cells(i, PosX_StartDay) = BufDate1
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = BufDate2
+            Worksheets(Calc1Sheet).Cells(i, PosX_Priority) = BufInt1
+        End If
+        
+    Next i
+
+
+'====================================='
+'情報編集(2)
+'====================================='
+    For i = EndY To 1 Step -1
+        If Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1) = "" Then
+           Worksheets(Calc1Sheet).Rows(i).Delete
+        End If
+    Next i
+
+'====================================='
+'情報編集(3)
+'====================================='
+    '表の最終行列を取得
+    EndY = Worksheets(Calc1Sheet).Cells(Rows.Count, PosY_OffsetStartDB).End(xlUp).Row
+    EndX = Worksheets(Calc1Sheet).Cells(PosX_OffsetStartDB, Columns.Count).End(xlToLeft).Column
+    
+    With Application.WorksheetFunction 'Excelのワークシート関数を使う
+    Worksheets(Calc1Sheet).Activate
+    'MinWorkStartDay = .Min(Range(Cells(PosY_OffsetStartDB, PosX_StartDay), Cells(EndY, PosX_StartDay))) 'タスクの開始日を記録
+    MinWorkStartDay = ProjectStartDay
+    End With
+    
+    For i = PosY_OffsetStartDB To EndY
+        Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf1) = (Worksheets(Calc1Sheet).Cells(i, PosX_PlanDays) * (100 - Worksheets(Calc1Sheet).Cells(i, PosX_Progress))) / 100 + Worksheets(Calc1Sheet).Cells(i, PosX_AddDays)
+        Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf2) = (Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf1) / OneDayWorkTime) '一日８時間労働
+        Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf3) = Worksheets(Calc1Sheet).Cells(i, PosX_StartDay) - MinWorkStartDay
+        Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf4) = Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) - MinWorkStartDay
+    Next i
+   
+
+End Function
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'
+'-------------------------------------------------------------------------
+Function Sort_Task()
+'====================================='
+'ソート処理(0/プロジェクト)
+'====================================='
+   '表の最終行列を取得
+    EndY = Worksheets(Calc1Sheet).Cells(Rows.Count, PosY_OffsetStartDB).End(xlUp).Row
+    EndX = Worksheets(Calc1Sheet).Cells(PosX_OffsetStartDB, Columns.Count).End(xlToLeft).Column
+    
+    'ソート実行
+    Worksheets(Calc1Sheet).Activate
+    Worksheets(Calc1Sheet).Range(Cells(PosY_OffsetStartDB, PosX_OffsetStartDB), Cells(EndY, EndX)).Sort _
+    Key1:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_Priority), order1:=xlAscending, _
+    Key2:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_StartDay), order2:=xlAscending, _
+    Key3:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_EndDay), order3:=xlAscending
+    
+    
+    ' Key1:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_Priority), order1:=xlDescending, _
+
+
+
+
+    For i = 1 To EndY
+    '各プロジェクト毎の開始可能日を記録する
+        NowProject = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1)
+        Call WriteData(Calc2Sheet, NowProject, Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf3))
+    Next i
+    
+
+
+
+
+
+    '作業開始/終了日(初期値)を記録シートに保存する
+    With Application.WorksheetFunction 'Excelのワークシート関数を使う
+    For i = 1 To EndY
+    
+        '記録データの確保
+        NowProject = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1)
+        NowCharge = Worksheets(Calc1Sheet).Cells(i, PosX_Charge)
+        NowWorkStartDay = Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf3)
+    
+    
+        'データの記録
+        Call WriteData(Calc2Sheet, NowCharge, 0)
+        Call WriteData(Calc2Sheet, NowProject, NowWorkStartDay)
+    
+    Next
+    
+    
+    '作業開始/終了日の計算
+    For i = PosY_OffsetStartDB To EndY
+        
+        '初期値設定
+        NowProject = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1)
+        NowPriority = Worksheets(Calc1Sheet).Cells(i, PosX_Priority)
+        NowCharge = Worksheets(Calc1Sheet).Cells(i, PosX_Charge)
+        
+        NowProgress = Worksheets(Calc1Sheet).Cells(i, PosX_Progress)
+               
+        NowChargeStart = ReadData(Calc2Sheet, NowCharge)
+        NowProjectStart = ReadData(Calc2Sheet, NowProject)
+        
+        
+        NowProjectEnd = Worksheets(Calc1Sheet).Cells(i, PosX_EndDay)
+        
+        
+        NowWorkStartDay = .Max(NowChargeStart, NowProjectStart)
+        NowWorkEndDay = NowWorkStartDay + Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf2) '!
+        
+        BK_NowChargeStart = NowChargeStart
+        BK_NowProjectStart = NowProjectStart
+        BK_NowProjectEnd = NowProjectEnd
+        BK_NowWorkStartDay = NowWorkStartDay
+        BK_NowPriority = NowPriority
+           
+        Check_ProjectHead = NowProject
+                
+        '入れ替え対象のタスクを記録する
+        ChangeTask = i
+              
+         
+    For SerchCount = i + 1 To EndY
+        NextProject = Worksheets(Calc1Sheet).Cells(SerchCount, PosX_WorkName1)
+        NextPriority = Worksheets(Calc1Sheet).Cells(SerchCount, PosX_Priority)
+        NextCharge = Worksheets(Calc1Sheet).Cells(SerchCount, PosX_Charge)
+        NextProgress = Worksheets(Calc1Sheet).Cells(SerchCount, PosX_Progress)
+        NextChargeStart = ReadData(Calc2Sheet, NextCharge)
+        NextProjectStart = ReadData(Calc2Sheet, NextProject)
+        
+        NextProjectEnd = Worksheets(Calc1Sheet).Cells(SerchCount, PosX_EndDay)
+        
+        
+        NextWorkStartDay = .Max(NextChargeStart, NextProjectStart)
+        NextWorkEndDay = NextWorkStartDay + Worksheets(Calc1Sheet).Cells(SerchCount, PosX_CalcBuf2)
+        
+    'プロジェクトの先頭案件のみを、入れ替えの対象とする
+    If Check_ProjectHead <> NextProject Then
+        Check_ProjectHead = NextProject
+        
+        
+        
+'    If (NowProject <> NextProject _
+'        And NowCharge = NextCharge) Then
+            
+     If (NowProject <> NextProject) Then
+    
+    
+    
+    
+    
+    '---------------------
+        If NowProgress >= 100 Then
+            '進捗率100%の時、処理なし
+        
+        ElseIf NowPriority < NextPriority _
+            And NowWorkStartDay >= NextWorkStartDay Then
+            '1.現在選択中の案件より、　比較対象の案件の方が優先度が高い && 現時点で比較対象の案件を開始できる!!!
+            
+                NowProject = NextProject
+                NowCharge = NextCharge
+                NowPriority = NextPriority
+                NowChargeStart = NextChargeStart
+                NowProjectStart = NextProjectStart
+                NowProjectEnd = NextProjectEnd
+                NowWorkStartDay = NextWorkStartDay
+                NowWorkEndDay = NextWorkEndDay
+                NowProgress = NextProgress
+                ChangeTask = SerchCount
+     
+     
+        ElseIf NowPriority = NextPriority _
+            And NowWorkStartDay >= NextWorkStartDay _
+            And NowProjectEnd > NextProjectEnd Then
+            '2.現在選択中の案件より、　比較対象の案件の方が優先度が同じ　&　現時点で比較対象の案件を開始できる && 終了日が早い!!!
+            
+                NowProject = NextProject
+                NowCharge = NextCharge
+                NowPriority = NextPriority
+                NowChargeStart = NextChargeStart
+                NowProjectStart = NextProjectStart
+                NowProjectEnd = NextProjectEnd
+                NowWorkStartDay = NextWorkStartDay
+                NowWorkEndDay = NextWorkEndDay
+                NowProgress = NextProgress
+                ChangeTask = SerchCount
+     
+     
+        ElseIf NowWorkStartDay >= NextWorkStartDay _
+            And NowProjectEnd > NextProjectEnd Then
+            '3.現時点で比較対象の案件を開始できる && 終了日が早い!!!
+          
+                NowProject = NextProject
+                NowCharge = NextCharge
+                NowPriority = NextPriority
+                NowChargeStart = NextChargeStart
+                NowProjectStart = NextProjectStart
+                NowProjectEnd = NextProjectEnd
+                NowWorkStartDay = NextWorkStartDay
+                NowWorkEndDay = NextWorkEndDay
+                NowProgress = NextProgress
+                ChangeTask = SerchCount
+          
+          
+        End If
+
+
+
+
+
+
+    End If
+    End If
+    Next SerchCount
+    
+    
+    '---------------------
+        '優先件の高いタスクを処理するため、データ移動を行う(優先権の高いタスクをカットペーストして現行に持ってくる)
+        If ChangeTask <> i Then
+        
+            Rows(ChangeTask).Cut
+            Rows(i).Insert
+        
+        End If
+        
+                      
+        '作業開始日
+        If NowProgress >= 100 Then
+            Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf5) = NowProjectStart
+        Else
+            Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf5) = NowWorkStartDay
+        End If
+        
+        '作業終了日
+        If NowProgress >= 100 Then
+            Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) = NowProjectStart
+        Else
+            NowWorkStartDay = NowWorkStartDay + Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf2)
+            Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) = NowWorkStartDay
+        End If
+        
+        '日時表示へ変換
+        Worksheets(Calc1Sheet).Cells(i, PosX_StartDay) = DateAdd("d", .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf5), 0), MinWorkStartDay)
+        
+        
+        If NowProgress >= 100 Then
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = DateAdd("d", .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6), 0), MinWorkStartDay)
+        ElseIf Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) - .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6), 0) = 0 Then
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = DateAdd("d", .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6), 0) - 1, MinWorkStartDay)
+        Else
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = DateAdd("d", .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6), 0), MinWorkStartDay)
+        End If
+
+
+'----------------------------
+    If NowProgress >= 100 Then
+        '何もしない
+    Else
+    
+        Check_Holiday = 0
+        BK_Check_Holiday = 0
+        Start_Day = Worksheets(Calc1Sheet).Cells(i, PosX_StartDay)
+        End_Day = Worksheets(Calc1Sheet).Cells(i, PosX_EndDay)
+        
+        For Count_Holiday = 0 To 365
+ 
+            Check_Holiday = .CountIfs(Worksheets(HolidaySheet).Range(PosXY_HolidayArea), ">=" & Start_Day, Worksheets(HolidaySheet).Range(PosXY_HolidayArea), "<=" & DateAdd("d", Check_Holiday, End_Day))
+
+            If Check_Holiday = BK_Check_Holiday Then
+                Exit For
+            End If
+    
+            BK_Check_Holiday = Check_Holiday
+    
+        Next Count_Holiday
+ 
+        UpDateLatsDay = Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) + Check_Holiday
+        
+        If Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) - .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6), 0) = 0 Then
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = DateAdd("d", .RoundDown(UpDateLatsDay - 1, 0), MinWorkStartDay)
+        
+        Else
+ 
+            Worksheets(Calc1Sheet).Cells(i, PosX_EndDay) = DateAdd("d", .RoundDown(UpDateLatsDay, 0), MinWorkStartDay)
+        End If
+        
+    End If
+'----------------------------
+
+        'データの記録
+        If NowProgress < 100 Then
+            Call WriteData(Calc2Sheet, NowCharge, UpDateLatsDay)
+            Call WriteData(Calc2Sheet, NowProject, UpDateLatsDay)
+        End If
+        
+        '終了時、実行番号の記載
+        Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf1) = i
+                
+    Next i
+    End With
+
+
+End Function
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'
+'-------------------------------------------------------------------------
+Function Display_Chart()
+
+'====================================='
+'ガンチャート表示
+'====================================='
+   '表の最終行列を取得
+    EndY = Worksheets(Calc1Sheet).Cells(Rows.Count, PosY_OffsetStartDB).End(xlUp).Row
+    EndX = Worksheets(Calc1Sheet).Cells(PosX_OffsetStartDB, Columns.Count).End(xlToLeft).Column
+    
+    Worksheets(Calc1Sheet).Activate
+    Worksheets(Calc1Sheet).Range(Cells(PosY_OffsetStartDB, PosX_WorkNumber), Cells(EndY, EndX)).Sort _
+     Key1:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_WorkNumber), order1:=xlAscending
+
+    '日時表示へ変換(ガンチャート設定値のクリア)
+        Worksheets(Out1Sheet).Range("C5:K259").Value = "-"
+        Worksheets(Out1Sheet).Range("B3").Value = MinWorkStartDay
+        
+    'プロジェクト項目のコピー
+        Worksheets(InpSheet).Range("B3:D257").Copy Destination:=Worksheets(Out1Sheet).Range("C5")
+
+        Worksheets(InpSheet).Range("E3:F257").Copy
+        Worksheets(Out1Sheet).Range("F5").PasteSpecial Paste:=xlPasteValues
+        Application.CutCopyMode = False
+      
+
+   'ガンチャート表示
+    For i = PosY_OffsetStartDB To EndY
+    
+        With Application.WorksheetFunction 'Excelのワークシート関数を使う
+        OutY = Worksheets(Calc1Sheet).Cells(i, PosX_WorkNumber)
+        
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_EndDay) = Worksheets(Calc1Sheet).Cells(i, PosX_StartDay)
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_Priority) = Worksheets(Calc1Sheet).Cells(i, PosX_EndDay)
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_PlanDays) = .RoundDown(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf6) - Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf5), 1)
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_AddDays) = Worksheets(Calc1Sheet).Cells(i, PosX_Priority)
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_Charge) = Worksheets(Calc1Sheet).Cells(i, PosX_Charge)
+        Worksheets(Out1Sheet).Cells(OutY + Counter_DeleteY, PosX_Progress) = Worksheets(Calc1Sheet).Cells(i, PosX_Progress) / 100
+        
+         End With
+
+    Next i
+
+
+
+
+End Function
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'
+'-------------------------------------------------------------------------
+Function Display_List()
+
+   
+
+'====================================='
+'ToDo List作成
+'====================================='
+    '表示のクリア
+    'Worksheets(Out2Sheet).Cells.Clear
+    Worksheets(Out2Sheet).Range("B3:J261").Value = "-"
+            
+   '表の最終行列を取得
+    EndY = Worksheets(Calc1Sheet).Cells(Rows.Count, PosY_OffsetStartDB).End(xlUp).Row
+    EndX = Worksheets(Calc1Sheet).Cells(PosX_OffsetStartDB, Columns.Count).End(xlToLeft).Column
+    
+    'ソート実行
+    Worksheets(Calc1Sheet).Activate
+    Worksheets(Calc1Sheet).Range(Cells(PosY_OffsetStartDB, PosX_OffsetStartDB), Cells(EndY, EndX)).Sort _
+    Key1:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_Charge), order1:=xlAscending, _
+    Key2:=Worksheets(Calc1Sheet).Cells(PosY_OffsetStartDB, PosX_StartDay), order2:=xlAscending
+
+
+   'ToDoリスト表示
+    For i = PosY_OffsetStartDB To EndY
+    
+        With Application.WorksheetFunction 'Excelのワークシート関数を使う
+        
+        OutY = Counter_DeleteY + i
+        
+        
+        If Worksheets(Calc1Sheet).Cells(i, PosX_Progress) >= 100 Then
+            Worksheets(Out2Sheet).Cells(OutY, 2) = ChrW(9745)
+            
+        Else
+            Worksheets(Out2Sheet).Cells(OutY, PosX_WorkName1) = "□"
+        End If
+        
+        Worksheets(Out2Sheet).Cells(OutY, PosX_WorkName2) = Worksheets(Calc1Sheet).Cells(i, PosX_Charge)
+        Worksheets(Out2Sheet).Cells(OutY, PosX_WorkName3) = Format(Worksheets(Calc1Sheet).Cells(i, PosX_StartDay), "yyyy/mm/dd")
+        Worksheets(Out2Sheet).Cells(OutY, PosX_StartDay) = Format(Worksheets(Calc1Sheet).Cells(i, PosX_EndDay), "yyyy/mm/dd")
+        
+        Worksheets(Out2Sheet).Cells(OutY, PosX_EndDay) = Format(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf2), "0.00") & "日(" & Format(Worksheets(Calc1Sheet).Cells(i, PosX_CalcBuf2) * OneDayWorkTime, "0.00") & "時間)"
+           
+        Worksheets(Out2Sheet).Cells(OutY, PosX_Priority) = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName1)
+        Worksheets(Out2Sheet).Cells(OutY, PosX_PlanDays) = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName2)
+        Worksheets(Out2Sheet).Cells(OutY, PosX_AddDays) = Worksheets(Calc1Sheet).Cells(i, PosX_WorkName3)
+         
+        Worksheets(Out2Sheet).Cells(OutY, PosX_Charge) = Worksheets(Calc1Sheet).Cells(i, PosX_Progress) & "%"
+
+         
+         End With
+
+    Next i
+
+
+End Function
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'
+'-------------------------------------------------------------------------
+Function End_WorkSheet()
+
+    '計算シートの削除
+    Application.DisplayAlerts = False 'アラートメッセージ無効
+    For Each ws In Worksheets
+        If ws.Name = Calc1Sheet Then Worksheets(Calc1Sheet).Delete
+    Next ws
+
+    For Each ws In Worksheets
+        If ws.Name = Calc2Sheet Then Worksheets(Calc2Sheet).Delete
+    Next ws
+
+ 
+    Application.DisplayAlerts = True 'アラートメッセージ有効
+    
+    '表示切替
+    Worksheets(Out1Sheet).Activate
+
+End Function
+
+
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+'
+'-------------------------------------------------------------------------
+Function xxxxxxxxxxxxx()
+
+End Function
+
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+Function WriteData(ByVal SheetName As String, ByVal StoreDataName As String, ByVal DataValue As Double)
+
+    CheckAllDataNum = Application.WorksheetFunction.CountA(Worksheets(SheetName).Range("A:A"))
+    CheckStoreData = Application.WorksheetFunction.CountIf(Worksheets(SheetName).Range("A:A"), StoreDataName)
+    
+    'データ登録あり：登録データの獲得/登録データなし：初期データの登録
+    If CheckAllDataNum = 0 Or CheckStoreData = 0 Then
+        'データ登録なし
+        Worksheets(SheetName).Cells(CheckAllDataNum + 1, 1) = StoreDataName
+        Worksheets(SheetName).Cells(CheckAllDataNum + 1, 2) = DataValue
+    
+    Else
+        'データ登録あり
+        DataYpos = Application.WorksheetFunction.Match(StoreDataName, Worksheets(SheetName).Range("A:A"), 0)
+        Worksheets(SheetName).Cells(DataYpos, 2) = DataValue
+  
+    End If
+
+End Function
+
+
+'=========================================================================
+'SubFunction
+'=========================================================================
+Function ReadData(ByVal SheetName As String, ByVal StoreDataName As String) As Double
+
+    CheckAllDataNum = Application.WorksheetFunction.CountA(Worksheets(SheetName).Range("A:A"))
+    CheckStoreData = Application.WorksheetFunction.CountIf(Worksheets(SheetName).Range("A:A"), StoreDataName)
+    
+    'データ登録あり：登録データの獲得/登録データなし：初期データの登録
+    If CheckAllDataNum = 0 Or CheckStoreData = 0 Then
+        Worksheets(SheetName).Cells(CheckAllDataNum + 1, 1) = StoreDataName
+        Worksheets(SheetName).Cells(CheckAllDataNum + 1, 2) = 0
+        ReturnData = 0
+    
+    Else
+        ReturnData = Application.WorksheetFunction.VLookup(StoreDataName, Worksheets(SheetName).Range("A:B"), 2, False)
+  
+    End If
+    
+    ReadData = ReturnData
+    
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+
